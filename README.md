@@ -17,27 +17,53 @@
 
 ### Требования
 
+- Git
 - Компилятор Vala
 - Библиотеки разработки GTK4
 - Библиотеки разработки libgee-0.8
 - Система сборки Meson
 - Инструмент сборки Ninja
 
-### Инструкция по сборке
+### Установка зависимостей
+
+На Ubuntu/Debian:
 
 ```bash
-# Создать директорию сборки
-meson setup builddir
-
-# Перейти в директорию сборки
-cd builddir
-
-# Выполнить компиляцию
-ninja
+sudo apt update
+sudo apt install git valac libgtk-4-dev libgee-0.8-dev meson ninja-build
 ```
 
-Запуск приложения:
+На Fedora:
+
 ```bash
+sudo dnf install git vala gtk4-devel libgee-devel meson ninja-build
+```
+
+На Arch Linux:
+
+```bash
+sudo pacman -S git vala gtk4 libgee meson ninja
+```
+
+### Полная инструкция по сборке
+
+```bash
+# Клонирование репозитория
+git clone https://github.com/danayer/Ballistic-Pendulum-Simulator.git
+
+# Переход в папку проекта
+cd Ballistic-Pendulum-Simulator
+
+# Создание директории сборки
+meson setup builddir
+
+# Переход в директорию сборки
+cd builddir
+
+# Выполнение компиляции
+ninja
+
+# Запуск приложения
 ./ballistic-pendulum
 ```
 
@@ -46,6 +72,9 @@ ninja
 Для создания портативного пакета AppImage используйте предоставленный скрипт:
 
 ```bash
+# Вернитесь в корневую папку проекта (если вы в builddir)
+cd ..
+
 # Сделать скрипт исполняемым
 chmod +x build-appimage.sh
 
