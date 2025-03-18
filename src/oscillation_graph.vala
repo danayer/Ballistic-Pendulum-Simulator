@@ -9,6 +9,7 @@ public class OscillationGraph : Gtk.DrawingArea {
     private double hover_x;
     private double hover_y;
     private bool is_hovering;
+    private int data_count = 0; // Track total number of points added
     
     // Constants
     private const int PADDING = 20;
@@ -48,8 +49,10 @@ public class OscillationGraph : Gtk.DrawingArea {
     }
     
     public void add_data_point(double angle, double time) {
+        // Add the new data point
         angles.add(angle * 180 / Math.PI); // Convert to degrees
         times.add(time);
+        data_count++;
         
         // Update max values
         if (Math.fabs(angle * 180 / Math.PI) > max_angle) {
@@ -60,20 +63,8 @@ public class OscillationGraph : Gtk.DrawingArea {
             max_time = time + 0.5; // Add more margin for longer simulations
         }
         
-        // Limit data points to avoid performance issues with very long simulations
-        if (angles.size > 1000) {
-            // Keep only every other point when we get too many
-            Gee.ArrayList<double?> new_angles = new Gee.ArrayList<double?>();
-            Gee.ArrayList<double?> new_times = new Gee.ArrayList<double?>();
-            
-            for (int i = 0; i < angles.size; i += 2) {
-                new_angles.add(angles[i]);
-                new_times.add(times[i]);
-            }
-            
-            angles = new_angles;
-            times = new_times;
-        }
+        // Print the current count of data points (helpful for debugging)
+        print("Data points: %d\n", data_count);
         
         queue_draw();
     }
@@ -83,6 +74,7 @@ public class OscillationGraph : Gtk.DrawingArea {
         times.clear();
         max_angle = 0.1;
         max_time = 0.1;
+        data_count = 0;
         queue_draw();
     }
     
@@ -167,14 +159,20 @@ public class OscillationGraph : Gtk.DrawingArea {
         cr.show_text("Угол (°)");
         cr.restore();
         
-        // Draw data points and line
+        // Draw data points and line - optimize for large datasets
         if (angles.size > 1) {
             // Draw the graph line
             cr.set_source_rgb(0.2, 0.4, 0.8);
             cr.set_line_width(2);
             
             bool first = true;
-            for (int i = 0; i < angles.size; i++) {
+            
+            // For very large datasets, draw at most one point per pixel to optimize performance
+            int total_points = angles.size;
+            int step = total_points > graph_width ? total_points / graph_width : 1;
+            
+            // Always ensure we include the first and last point
+            for (int i = 0; i < angles.size; i += step) {
                 double angle_value = angles[i] ?? 0.0;
                 double time_value = times[i] ?? 0.0;
                 
@@ -188,19 +186,62 @@ public class OscillationGraph : Gtk.DrawingArea {
                     cr.line_to(x, y);
                 }
             }
+            
+            // Make sure to include the last point if we're using a step > 1
+            if (step > 1 && total_points > 0) {
+                int last_idx = total_points - 1;
+                double last_angle = angles[last_idx] ?? 0.0;
+                double last_time = times[last_idx] ?? 0.0;
+                
+                double x = graph_x + (last_time / max_time) * graph_width;
+                double y = graph_y + graph_height / 2 - (last_angle / max_angle) * (graph_height / 2);
+                
+                cr.line_to(x, y);
+            }
+            
             cr.stroke();
             
-            // Draw points
-            for (int i = 0; i < angles.size; i++) {
-                double angle_value = angles[i] ?? 0.0;
-                double time_value = times[i] ?? 0.0;
+            // Draw points with optimization for large datasets
+            if (total_points <= 1000) {
+                // For smaller datasets, draw each point
+                for (int i = 0; i < angles.size; i++) {
+                    double angle_value = angles[i] ?? 0.0;
+                    double time_value = times[i] ?? 0.0;
+                    
+                    double x = graph_x + (time_value / max_time) * graph_width;
+                    double y = graph_y + graph_height / 2 - (angle_value / max_angle) * (graph_height / 2);
+                    
+                    cr.set_source_rgb(0.0, 0.0, 0.8);
+                    cr.arc(x, y, POINT_RADIUS, 0, 2 * Math.PI);
+                    cr.fill();
+                }
+            } else {
+                // For larger datasets, draw fewer points for performance
+                for (int i = 0; i < angles.size; i += step * 5) {
+                    double angle_value = angles[i] ?? 0.0;
+                    double time_value = times[i] ?? 0.0;
+                    
+                    double x = graph_x + (time_value / max_time) * graph_width;
+                    double y = graph_y + graph_height / 2 - (angle_value / max_angle) * (graph_height / 2);
+                    
+                    cr.set_source_rgb(0.0, 0.0, 0.8);
+                    cr.arc(x, y, POINT_RADIUS, 0, 2 * Math.PI);
+                    cr.fill();
+                }
                 
-                double x = graph_x + (time_value / max_time) * graph_width;
-                double y = graph_y + graph_height / 2 - (angle_value / max_angle) * (graph_height / 2);
-                
-                cr.set_source_rgb(0.0, 0.0, 0.8);
-                cr.arc(x, y, POINT_RADIUS, 0, 2 * Math.PI);
-                cr.fill();
+                // Always draw the last point
+                if (total_points > 0) {
+                    int last_idx = total_points - 1;
+                    double last_angle = angles[last_idx] ?? 0.0;
+                    double last_time = times[last_idx] ?? 0.0;
+                    
+                    double x = graph_x + (last_time / max_time) * graph_width;
+                    double y = graph_y + graph_height / 2 - (last_angle / max_angle) * (graph_height / 2);
+                    
+                    cr.set_source_rgb(0.0, 0.0, 0.8);
+                    cr.arc(x, y, POINT_RADIUS, 0, 2 * Math.PI);
+                    cr.fill();
+                }
             }
         }
         
@@ -236,45 +277,56 @@ public class OscillationGraph : Gtk.DrawingArea {
                 cr.arc(x, y, POINT_RADIUS * 2, 0, 2 * Math.PI);
                 cr.fill();
                 
-                // Draw hover info box
-                string hover_text = "Время: %.2f с\nУгол: %.2f°".printf(
-                    time_value, angle_value);
+                // Prepare hover texts
+                string time_text = "Время: %.2f с".printf(time_value);
+                string angle_text = "Угол: %.2f°".printf(angle_value);
                 
-                // Background for text
-                Cairo.TextExtents extents;
+                // Get text dimensions for both text items
                 cr.set_font_size(12);
-                cr.text_extents(hover_text, out extents);
+                Cairo.TextExtents time_extents;
+                Cairo.TextExtents angle_extents;
+                cr.text_extents(time_text, out time_extents);
+                cr.text_extents(angle_text, out angle_extents);
                 
+                // Calculate the maximum width needed
+                double max_width = double.max(time_extents.width, angle_extents.width);
+                
+                // Position the hover info
                 double text_x = x + 10;
                 double text_y = y - 10;
+                double box_height = time_extents.height + angle_extents.height + 10; // Add padding
                 
                 // Adjust position if too close to edge
-                if (text_x + extents.width + 10 > width) {
-                    text_x = x - extents.width - 10;
+                if (text_x + max_width + 15 > width) {
+                    text_x = x - max_width - 15;
                 }
                 
-                if (text_y - extents.height - 10 < 0) {
-                    text_y = y + extents.height + 10;
+                if (text_y - box_height < 0) {
+                    text_y = y + 25;
                 }
                 
-                // Draw text background
+                // Draw unified text background with proper dimensions
                 cr.set_source_rgba(1.0, 1.0, 1.0, 0.85);
-                cr.rectangle(text_x - 5, text_y - extents.height - 5, 
-                             extents.width + 10, extents.height + 10);
+                cr.rectangle(text_x - 5, 
+                             text_y - box_height,
+                             max_width + 10, 
+                             box_height + 5);
                 cr.fill();
                 
                 // Draw border around text
                 cr.set_source_rgba(0.5, 0.5, 0.5, 0.8);
-                cr.rectangle(text_x - 5, text_y - extents.height - 5, 
-                             extents.width + 10, extents.height + 10);
+                cr.rectangle(text_x - 5, 
+                             text_y - box_height,
+                             max_width + 10, 
+                             box_height + 5);
                 cr.stroke();
                 
-                // Draw text
+                // Draw texts
                 cr.set_source_rgb(0.0, 0.0, 0.0);
+                cr.move_to(text_x, text_y - angle_extents.height - 5);
+                cr.show_text(time_text);
                 cr.move_to(text_x, text_y);
-                cr.show_text("Время: %.2f с".printf(time_value));
-                cr.move_to(text_x, text_y + extents.height + 2);
-                cr.show_text("Угол: %.2f°".printf(angle_value));
+                cr.show_text(angle_text);
             }
         }
     }
