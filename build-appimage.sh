@@ -137,8 +137,19 @@ fi
 echo -e "${BLUE}Creating AppImage package...${NC}"
 ./linuxdeploy-x86_64.AppImage --appdir=AppDir --plugin gtk --output appimage --desktop-file=AppDir/usr/share/applications/org.example.ballisticpendulum.desktop --icon-file=AppDir/usr/share/icons/hicolor/256x256/apps/org.example.ballisticpendulum.svg
 
-# Move AppImage to current directory
-mv *.AppImage ballistic-pendulum.AppImage
+# Find and rename the created AppImage (fix for the mv error)
+echo -e "${BLUE}Locating AppImage file...${NC}"
+CREATED_APPIMAGE=$(find . -maxdepth 1 -name "*ballisticpendulum*.AppImage" -o -name "*.AppImage" | head -n 1)
 
-echo -e "${GREEN}AppImage created: ballistic-pendulum.AppImage${NC}"
+if [ -n "$CREATED_APPIMAGE" ]; then
+    echo -e "${BLUE}Found AppImage: $CREATED_APPIMAGE${NC}"
+    echo -e "${BLUE}Renaming to ballistic-pendulum.AppImage...${NC}"
+    cp "$CREATED_APPIMAGE" "ballistic-pendulum.AppImage"
+    chmod +x "ballistic-pendulum.AppImage"
+    echo -e "${GREEN}AppImage created: ballistic-pendulum.AppImage${NC}"
+else
+    echo -e "${RED}Could not find the created AppImage file.${NC}"
+    echo -e "${RED}Please check the output directory manually.${NC}"
+fi
+
 echo -e "${GREEN}Now you can run your application by executing: ./ballistic-pendulum.AppImage${NC}"
